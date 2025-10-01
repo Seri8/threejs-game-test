@@ -2,35 +2,83 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Three.js Game - Dodge the Cubes</title>
+  <title>Waving Rectangle Tunnel</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #111; }
-    #score {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 20px;
-    }
-    #gameOver {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: red;
-      font-size: 40px;
-      font-family: Arial, sans-serif;
-      display: none;
-    }
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-  <div id="score">Score: 0</div>
-  <div id="gameOver">GAME OVER<br>Refresh to Restart</div>
-  
-  <!-- Three.js -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
-  <script src="script.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
+<script>
+  let scene, camera, renderer, tunnel = [];
+  let clock = new THREE.Clock();
+  let keys = {};
+
+  init();
+  animate();
+
+  function init() {
+    scene = new THREE.Scene();
+
+    // Camera
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.z = 5;
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Build tunnel
+    const depth = 200;
+    for (let i = 0; i < depth; i++) {
+      const w = 10;
+      const h = 6;
+      const geometry = new THREE.RingGeometry(w-0.2, w, 4, 1); // rectangle-like ring
+      const color = (i % 2 === 0) ? 0xff0000 : 0x000000;
+      const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(geometry, material);
+
+      mesh.position.z = -i * 2;
+      mesh.rotation.z = Math.PI / 4; // rotate to look rectangular
+      tunnel.push(mesh);
+      scene.add(mesh);
+    }
+
+    // Controls
+    window.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
+    window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
+    window.addEventListener("resize", onWindowResize, false);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    let t = clock.getElapsedTime();
+
+    // Wave effect
+    tunnel.forEach((mesh, i) => {
+      mesh.position.x = Math.sin(t*2 + i*0.3) * 2;
+      mesh.position.y = Math.cos(t*1.5 + i*0.4) * 1.5;
+    });
+
+    // Movement
+    const speed = 0.1;
+    if (keys["w"] || keys["arrowup"]) camera.position.y += speed;
+    if (keys["s"] || keys["arrowdown"]) camera.position.y -= speed;
+    if (keys["a"] || keys["arrowleft"]) camera.position.x -= speed;
+    if (keys["d"] || keys["arrowright"]) camera.position.x += speed;
+
+    camera.position.z -= 0.1; // auto forward
+
+    renderer.render(scene, camera);
+  }
+
+  function onWindowResize() {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+</script>
 </body>
 </html>
