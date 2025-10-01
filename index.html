@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js Game - Dodge the Cubes</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 20px;
+    }
+    #gameOver {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: red;
+      font-size: 40px;
+      font-family: Arial, sans-serif;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <div id="gameOver">GAME OVER<br>Refresh to Restart</div>
+  
+  <!-- Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
