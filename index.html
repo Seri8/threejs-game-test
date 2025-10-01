@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Wavy Rectangle Tunnel</title>
+  <title>Closed Wavy Rectangle Tunnel</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     canvas { display: block; }
@@ -14,7 +14,7 @@
   let scene, camera, renderer, tunnel = [];
   let clock = new THREE.Clock();
   let keys = {};
-  let player = { x: 0, y: 0, z: 5 }; // player position
+  let player = { x: 0, y: 0, z: 5 };
 
   init();
   animate();
@@ -31,20 +31,41 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Build tunnel
-    const depth = 200;
-    for (let i = 0; i < depth; i++) {
-      const baseW = 12;
-      const baseH = 8;
-      const geometry = new THREE.RingGeometry(baseW - 0.3, baseW, 4, 1);
-      const color = (i % 2 === 0) ? 0xff0000 : 0x000000;
-      const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
-      const mesh = new THREE.Mesh(geometry, material);
+    // Build tunnel segments
+    const depth = 100;   // number of segments
+    const length = 5;    // z spacing
+    const w = 12;        // tunnel width
+    const h = 8;         // tunnel height
+    const thickness = 0.5;
 
-      mesh.position.z = -i * 5; // distance between rectangles
-      mesh.rotation.z = Math.PI / 4; // make ring look like rectangle
-      tunnel.push(mesh);
-      scene.add(mesh);
+    for (let i = 0; i < depth; i++) {
+      let group = new THREE.Group();
+
+      // Top wall
+      let topGeo = new THREE.BoxGeometry(w, thickness, length);
+      let topMat = new THREE.MeshBasicMaterial({ color: (i % 2 === 0) ? 0xff0000 : 0x000000 });
+      let top = new THREE.Mesh(topGeo, topMat);
+      top.position.set(0, h/2, -i * length);
+      group.add(top);
+
+      // Bottom wall
+      let bottom = new THREE.Mesh(topGeo, topMat);
+      bottom.position.set(0, -h/2, -i * length);
+      group.add(bottom);
+
+      // Left wall
+      let sideGeo = new THREE.BoxGeometry(thickness, h, length);
+      let side = new THREE.Mesh(sideGeo, topMat);
+      side.position.set(-w/2, 0, -i * length);
+      group.add(side);
+
+      // Right wall
+      let side2 = new THREE.Mesh(sideGeo, topMat);
+      side2.position.set(w/2, 0, -i * length);
+      group.add(side2);
+
+      tunnel.push(group);
+      scene.add(group);
     }
 
     // Controls
@@ -57,29 +78,6 @@
     requestAnimationFrame(animate);
     let t = clock.getElapsedTime();
 
-    // Wave effect applied to tunnel
-    tunnel.forEach((mesh, i) => {
-      mesh.position.x = Math.sin(t*2 + i*0.3) * 1.5;
-      mesh.position.y = Math.cos(t*1.5 + i*0.4) * 1;
-    });
-
-    // Player movement: walk like in corridor
-    const moveSpeed = 0.2;
-    if (keys["w"] || keys["arrowup"]) player.z -= moveSpeed;
-    if (keys["s"] || keys["arrowdown"]) player.z += moveSpeed;
-    if (keys["a"] || keys["arrowleft"]) player.x -= moveSpeed;
-    if (keys["d"] || keys["arrowright"]) player.x += moveSpeed;
-
-    camera.position.set(player.x, player.y, player.z);
-
-    renderer.render(scene, camera);
-  }
-
-  function onWindowResize() {
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-</script>
-</body>
-</html>
+    // Apply wave motion to tunnel segments
+    tunnel.forEach((group, i) => {
+      group.position.x = Math.sin(t*2*
