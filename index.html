@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Waving Rectangle Tunnel</title>
+  <title>Wavy Rectangle Tunnel</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     canvas { display: block; }
@@ -14,6 +14,7 @@
   let scene, camera, renderer, tunnel = [];
   let clock = new THREE.Clock();
   let keys = {};
+  let playerOffset = { x: 0, y: 0 }; // keeps track of side movements
 
   init();
   animate();
@@ -35,13 +36,13 @@
     for (let i = 0; i < depth; i++) {
       const w = 10;
       const h = 6;
-      const geometry = new THREE.RingGeometry(w-0.2, w, 4, 1); // rectangle-like ring
+      const geometry = new THREE.RingGeometry(w - 0.2, w, 4, 1);
       const color = (i % 2 === 0) ? 0xff0000 : 0x000000;
       const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
       const mesh = new THREE.Mesh(geometry, material);
 
       mesh.position.z = -i * 2;
-      mesh.rotation.z = Math.PI / 4; // rotate to look rectangular
+      mesh.rotation.z = Math.PI / 4;
       tunnel.push(mesh);
       scene.add(mesh);
     }
@@ -62,14 +63,17 @@
       mesh.position.y = Math.cos(t*1.5 + i*0.4) * 1.5;
     });
 
-    // Movement
-    const speed = 0.1;
-    if (keys["w"] || keys["arrowup"]) camera.position.y += speed;
-    if (keys["s"] || keys["arrowdown"]) camera.position.y -= speed;
-    if (keys["a"] || keys["arrowleft"]) camera.position.x -= speed;
-    if (keys["d"] || keys["arrowright"]) camera.position.x += speed;
+    // Player movement: moves relative to tunnel, not free float
+    const speed = 0.15;
+    if (keys["w"] || keys["arrowup"]) playerOffset.y += speed;
+    if (keys["s"] || keys["arrowdown"]) playerOffset.y -= speed;
+    if (keys["a"] || keys["arrowleft"]) playerOffset.x -= speed;
+    if (keys["d"] || keys["arrowright"]) playerOffset.x += speed;
 
-    camera.position.z -= 0.1; // auto forward
+    // Camera follows tunnel automatically (always forward)
+    camera.position.z -= 0.2;
+    camera.position.x = playerOffset.x;
+    camera.position.y = playerOffset.y;
 
     renderer.render(scene, camera);
   }
