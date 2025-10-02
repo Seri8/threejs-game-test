@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Basic Neon Tunnel</title>
+  <title>Sci-Fi Tunnel</title>
   <style>
     body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
     canvas { display: block; }
@@ -34,6 +34,15 @@
   let playerLight;
   let hud = document.getElementById("hud");
 
+  const textureLoader = new THREE.TextureLoader();
+
+  // Sci-Fi Panel Textures (from PolyHaven)
+  const texBase = "https://cdn.jsdelivr.net/gh/Poly-Haven/textures@latest/metal-panels-002/";
+  const diffuseMap   = textureLoader.load(texBase + "metal-panels-002_diffuse.jpg");
+  const normalMap    = textureLoader.load(texBase + "metal-panels-002_normal.jpg");
+  const roughnessMap = textureLoader.load(texBase + "metal-panels-002_roughness.jpg");
+  const aoMap        = textureLoader.load(texBase + "metal-panels-002_ao.jpg");
+
   init();
   animate();
 
@@ -54,32 +63,33 @@
     document.body.appendChild(renderer.domElement);
 
     // Lights
-    scene.add(new THREE.AmbientLight(0x222233, 0.5));
+    scene.add(new THREE.AmbientLight(0x222233, 0.8));
 
-    playerLight = new THREE.PointLight(0xff00ff, 2, 50);
+    playerLight = new THREE.PointLight(0x00ffff, 2, 50);
     scene.add(playerLight);
 
     // Tunnel
-    const depth = 100, length = 6;
+    const depth = 80, length = 6;
     const radius = 7, segments = 64;
 
     for (let i = 0; i < depth; i++) {
-      const isRed = (i % 2 === 0);
-
       const mat = new THREE.MeshStandardMaterial({
-        color: isRed ? 0xaa0033 : 0x112244,
-        emissive: isRed ? 0xff0033 : 0x003366,
-        emissiveIntensity: isRed ? 2.0 : 0.3,
+        map: diffuseMap,
+        normalMap: normalMap,
+        roughnessMap: roughnessMap,
+        aoMap: aoMap,
+        emissive: 0x002244,
+        emissiveIntensity: 0.3,
         metalness: 0.8,
-        roughness: 0.25,
+        roughness: 0.3,
         side: THREE.BackSide
       });
 
       const geo = new THREE.CylinderGeometry(radius, radius, length, segments, 1, true);
+      geo.setAttribute("uv2", new THREE.BufferAttribute(geo.attributes.uv.array, 2)); // for AO map
       const cyl = new THREE.Mesh(geo, mat);
       cyl.rotation.x = Math.PI / 2;
       cyl.position.z = -i * length;
-      cyl.userData.isRed = isRed;
       tunnel.push(cyl);
       scene.add(cyl);
     }
@@ -97,10 +107,6 @@
     tunnel.forEach((cyl, i) => {
       cyl.position.x = Math.sin(t*1.5 + i*0.3) * 1.5;
       cyl.position.y = Math.cos(t*1.0 + i*0.4) * 1;
-
-      if (cyl.userData.isRed) {
-        cyl.material.emissiveIntensity = 1.5 + Math.sin(t*4 + i*0.2) * 0.5;
-      }
     });
 
     // Movement
