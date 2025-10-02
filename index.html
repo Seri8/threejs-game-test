@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Neon Wavy Tunnel with HUD</title>
+  <title>Shaded Neon Wavy Tunnel with HUD</title>
   <style>
     body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
     canvas { display: block; }
 
-    /* HUD Overlay */
     #hud {
       position: absolute;
       top: 10px;
@@ -48,30 +47,35 @@ function init() {
   // Renderer
   renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x001122); // blue background
+  renderer.setClearColor(0x001122);
   document.body.appendChild(renderer.domElement);
 
   // Lighting
-  const ambient = new THREE.AmbientLight(0x404040, 0.5);
+  const ambient = new THREE.AmbientLight(0x404040, 0.3);
   scene.add(ambient);
 
-  playerLight = new THREE.PointLight(0xff00ff, 1.5, 50);
+  const directional = new THREE.DirectionalLight(0xffffff, 0.5);
+  directional.position.set(5, 5, 10);
+  scene.add(directional);
+
+  playerLight = new THREE.PointLight(0xff00ff, 2, 50);
   playerLight.position.set(player.x, player.y, player.z);
   scene.add(playerLight);
 
-  // Tunnel (cylindrical)
+  // Tunnel
   const depth = 100, length = 5;
   const radius = 6, segments = 32;
 
   for (let i = 0; i < depth; i++) {
     const isRed = (i % 2 === 0);
 
+    // Gradient shading using MeshStandardMaterial
     const mat = new THREE.MeshStandardMaterial({
-      color: isRed ? 0xff0000 : 0x111111,
-      emissive: isRed ? 0xff0000 : 0x000000,
-      emissiveIntensity: isRed ? 1.0 : 0.05,
-      metalness: 0.3,
-      roughness: 0.4,
+      color: isRed ? 0xff4444 : 0x222244,
+      emissive: isRed ? 0xff0044 : 0x000022,
+      emissiveIntensity: isRed ? 0.8 : 0.05,
+      metalness: 0.6,
+      roughness: 0.3,
       side: THREE.BackSide
     });
 
@@ -79,7 +83,7 @@ function init() {
       new THREE.CylinderGeometry(radius, radius, length, segments, 1, true),
       mat
     );
-    cylinder.rotation.x = Math.PI / 2; // align along z-axis
+    cylinder.rotation.x = Math.PI / 2;
     cylinder.position.z = -i * length;
     cylinder.userData.isRed = isRed;
 
@@ -87,7 +91,6 @@ function init() {
     scene.add(cylinder);
   }
 
-  // Controls
   window.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
   window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
   window.addEventListener("resize", onWindowResize, false);
@@ -97,20 +100,19 @@ function animate() {
   requestAnimationFrame(animate);
   let t = clock.getElapsedTime();
 
-  // Wave motion + pulsing neon
   tunnel.forEach((cylinder, i) => {
-    const waveX = Math.sin(t*2 + i*0.3) * 1.5;
-    const waveY = Math.cos(t*1.5 + i*0.4) * 1;
-    cylinder.position.x = waveX;
-    cylinder.position.y = waveY;
+    // Wavy motion
+    cylinder.position.x = Math.sin(t*2 + i*0.3) * 1.5;
+    cylinder.position.y = Math.cos(t*1.5 + i*0.4) * 1;
 
+    // Pulsing neon for red segments
     if (cylinder.userData.isRed) {
-      const pulse = 0.8 + Math.sin(t*2 + i*0.2) * 0.4;
+      const pulse = 0.6 + Math.sin(t*3 + i*0.2) * 0.4;
       cylinder.material.emissiveIntensity = pulse;
     }
   });
 
-  // Movement
+  // Player movement
   const moveSpeed = 0.2;
   let moved = false;
   if (keys["w"] || keys["arrowup"]) { player.z -= moveSpeed; moved = true; }
@@ -119,11 +121,9 @@ function animate() {
   if (keys["d"] || keys["arrowright"]) { player.x += moveSpeed; moved = true; }
   player.speed = moved ? moveSpeed * 60 : 0;
 
-  // Camera & light follow
   camera.position.set(player.x, player.y, player.z);
   playerLight.position.set(player.x, player.y, player.z);
 
-  // HUD Update
   hud.innerHTML = `
     <b>🚀 Tunnel HUD</b><br>
     X: ${player.x.toFixed(2)}<br>
