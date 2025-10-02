@@ -27,114 +27,119 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
 <script>
-  let scene, camera, renderer, tunnel = [];
-  let clock = new THREE.Clock();
-  let keys = {};
-  let player = { x: 0, y: 0, z: 5, speed: 0 };
-  let playerLight;
-  let hud = document.getElementById("hud");
+let scene, camera, renderer, tunnel = [];
+let clock = new THREE.Clock();
+let keys = {};
+let player = { x: 0, y: 0, z: 5, speed: 0 };
+let playerLight;
+let hud = document.getElementById("hud");
 
-  init();
-  animate();
+init();
+animate();
 
-  function init() {
-    scene = new THREE.Scene();
+function init() {
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x000000, 0, 200);
 
-    // Camera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
-    camera.position.set(player.x, player.y, player.z);
+  // Camera
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+  camera.position.set(player.x, player.y, player.z);
 
-    // Renderer
-    renderer = new THREE.WebGLRenderer({antialias:true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000);
-    document.body.appendChild(renderer.domElement);
+  // Renderer
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000);
+  document.body.appendChild(renderer.domElement);
 
-    // Lighting
-    const ambient = new THREE.AmbientLight(0x404040, 0.6);
-    scene.add(ambient);
+  // Lighting
+  const ambient = new THREE.AmbientLight(0x404040, 0.5);
+  scene.add(ambient);
 
-    playerLight = new THREE.PointLight(0xff0000, 1.5, 50);
-    playerLight.position.set(player.x, player.y, player.z);
-    scene.add(playerLight);
+  playerLight = new THREE.PointLight(0xff00ff, 1.5, 50);
+  playerLight.position.set(player.x, player.y, player.z);
+  scene.add(playerLight);
 
-    // Tunnel
-    const depth = 150, length = 5, w = 12, h = 8;
+  // Tunnel (cylindrical)
+  const depth = 100, length = 5;
+  const radius = 6, segments = 32;
 
-    for (let i = 0; i < depth; i++) {
-      const isRed = (i % 2 === 0);
+  for (let i = 0; i < depth; i++) {
+    const isRed = (i % 2 === 0);
 
-      const mat = new THREE.MeshStandardMaterial({
-        color: isRed ? 0xff0000 : 0x111111,
-        emissive: isRed ? 0xff0000 : 0x000000,
-        emissiveIntensity: isRed ? 1.0 : 0.1,
-        metalness: 0.3,
-        roughness: 0.4,
-        side: THREE.BackSide
-      });
-
-      const boxGeo = new THREE.BoxGeometry(w, h, length);
-      const box = new THREE.Mesh(boxGeo, mat);
-      box.position.z = -i * length;
-
-      box.userData.isRed = isRed;
-      tunnel.push(box);
-      scene.add(box);
-    }
-
-    // Controls
-    window.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
-    window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
-    window.addEventListener("resize", onWindowResize, false);
-  }
-
-  function animate() {
-    requestAnimationFrame(animate);
-    let t = clock.getElapsedTime();
-
-    // Wave motion + pulsing neon
-    tunnel.forEach((box, i) => {
-      box.position.x = Math.sin(t*2 + i*0.3) * 1.5;
-      box.position.y = Math.cos(t*1.5 + i*0.4) * 1;
-
-      if (box.userData.isRed) {
-        let pulse = 0.8 + Math.sin(t*2 + i*0.2) * 0.4;
-        box.material.emissiveIntensity = pulse;
-      }
+    const mat = new THREE.MeshStandardMaterial({
+      color: isRed ? 0xff0000 : 0x111111,
+      emissive: isRed ? 0xff0000 : 0x000000,
+      emissiveIntensity: isRed ? 1.0 : 0.05,
+      metalness: 0.3,
+      roughness: 0.4,
+      side: THREE.BackSide
     });
 
-    // Movement
-    const moveSpeed = 0.2;
-    let moved = false;
+    const cylinder = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, length, segments, 1, true),
+      mat
+    );
+    cylinder.rotation.x = Math.PI / 2; // align along z-axis
+    cylinder.position.z = -i * length;
+    cylinder.userData.isRed = isRed;
 
-    if (keys["w"] || keys["arrowup"]) { player.z -= moveSpeed; moved = true; }
-    if (keys["s"] || keys["arrowdown"]) { player.z += moveSpeed; moved = true; }
-    if (keys["a"] || keys["arrowleft"]) { player.x -= moveSpeed; moved = true; }
-    if (keys["d"] || keys["arrowright"]) { player.x += moveSpeed; moved = true; }
-
-    player.speed = moved ? moveSpeed * 60 : 0; // speed in "units/sec"
-
-    // Camera & light follow
-    camera.position.set(player.x, player.y, player.z);
-    playerLight.position.set(player.x, player.y, player.z);
-
-    // HUD Update
-    hud.innerHTML = `
-      <b>🚀 Tunnel HUD</b><br>
-      X: ${player.x.toFixed(2)}<br>
-      Y: ${player.y.toFixed(2)}<br>
-      Z: ${player.z.toFixed(2)}<br>
-      Speed: ${player.speed.toFixed(1)}
-    `;
-
-    renderer.render(scene, camera);
+    tunnel.push(cylinder);
+    scene.add(cylinder);
   }
 
-  function onWindowResize() {
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
+  // Controls
+  window.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
+  window.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
+  window.addEventListener("resize", onWindowResize, false);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  let t = clock.getElapsedTime();
+
+  // Wave motion + pulsing neon
+  tunnel.forEach((cylinder, i) => {
+    const waveX = Math.sin(t*2 + i*0.3) * 1.5;
+    const waveY = Math.cos(t*1.5 + i*0.4) * 1;
+    cylinder.position.x = waveX;
+    cylinder.position.y = waveY;
+
+    if (cylinder.userData.isRed) {
+      const pulse = 0.8 + Math.sin(t*2 + i*0.2) * 0.4;
+      cylinder.material.emissiveIntensity = pulse;
+    }
+  });
+
+  // Movement
+  const moveSpeed = 0.2;
+  let moved = false;
+  if (keys["w"] || keys["arrowup"]) { player.z -= moveSpeed; moved = true; }
+  if (keys["s"] || keys["arrowdown"]) { player.z += moveSpeed; moved = true; }
+  if (keys["a"] || keys["arrowleft"]) { player.x -= moveSpeed; moved = true; }
+  if (keys["d"] || keys["arrowright"]) { player.x += moveSpeed; moved = true; }
+  player.speed = moved ? moveSpeed * 60 : 0;
+
+  // Camera & light follow
+  camera.position.set(player.x, player.y, player.z);
+  playerLight.position.set(player.x, player.y, player.z);
+
+  // HUD Update
+  hud.innerHTML = `
+    <b>🚀 Tunnel HUD</b><br>
+    X: ${player.x.toFixed(2)}<br>
+    Y: ${player.y.toFixed(2)}<br>
+    Z: ${player.z.toFixed(2)}<br>
+    Speed: ${player.speed.toFixed(1)}
+  `;
+
+  renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
 </script>
 </body>
 </html>
