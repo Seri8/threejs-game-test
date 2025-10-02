@@ -42,7 +42,7 @@
 
   function init() {
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x001122, 0.015);
+    scene.fog = new THREE.FogExp2(0x001122, 0.02);
 
     // Camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
@@ -58,36 +58,28 @@
 
     // Postprocessing
     const renderPass = new RenderPass(scene, camera);
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.2, 0.4, 0.85
-    );
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.85);
     composer = new EffectComposer(renderer);
     composer.addPass(renderPass);
     composer.addPass(bloomPass);
 
     // Lights
-    const ambient = new THREE.AmbientLight(0x222233, 0.4);
-    scene.add(ambient);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    dirLight.position.set(10, 20, 10);
-    scene.add(dirLight);
+    scene.add(new THREE.AmbientLight(0x222233, 0.5));
 
     playerLight = new THREE.PointLight(0xff00ff, 2, 50);
     scene.add(playerLight);
 
     // Tunnel
-    const depth = 120, length = 6;
+    const depth = 100, length = 6;
     const radius = 7, segments = 64;
 
     for (let i = 0; i < depth; i++) {
       const isRed = (i % 2 === 0);
 
-      const material = new THREE.MeshPhysicalMaterial({
+      const mat = new THREE.MeshPhysicalMaterial({
         color: isRed ? 0xaa0033 : 0x112244,
         emissive: isRed ? 0xff0033 : 0x003366,
-        emissiveIntensity: isRed ? 2.0 : 0.4,
+        emissiveIntensity: isRed ? 2.0 : 0.3,
         metalness: 0.8,
         roughness: 0.25,
         clearcoat: 1.0,
@@ -95,14 +87,13 @@
         side: THREE.BackSide
       });
 
-      const geometry = new THREE.CylinderGeometry(radius, radius, length, segments, 1, true);
-      const cylinder = new THREE.Mesh(geometry, material);
-      cylinder.rotation.x = Math.PI / 2;
-      cylinder.position.z = -i * length;
-      cylinder.userData.isRed = isRed;
-
-      tunnel.push(cylinder);
-      scene.add(cylinder);
+      const geo = new THREE.CylinderGeometry(radius, radius, length, segments, 1, true);
+      const cyl = new THREE.Mesh(geo, mat);
+      cyl.rotation.x = Math.PI / 2;
+      cyl.position.z = -i * length;
+      cyl.userData.isRed = isRed;
+      tunnel.push(cyl);
+      scene.add(cyl);
     }
 
     // Controls
@@ -115,16 +106,16 @@
     requestAnimationFrame(animate);
     let t = clock.getElapsedTime();
 
-    tunnel.forEach((cylinder, i) => {
-      cylinder.position.x = Math.sin(t*1.5 + i*0.3) * 1.5;
-      cylinder.position.y = Math.cos(t*1.0 + i*0.4) * 1;
+    tunnel.forEach((cyl, i) => {
+      cyl.position.x = Math.sin(t*1.5 + i*0.3) * 1.5;
+      cyl.position.y = Math.cos(t*1.0 + i*0.4) * 1;
 
-      if (cylinder.userData.isRed) {
-        const pulse = 1.5 + Math.sin(t*4 + i*0.2) * 0.5;
-        cylinder.material.emissiveIntensity = pulse;
+      if (cyl.userData.isRed) {
+        cyl.material.emissiveIntensity = 1.5 + Math.sin(t*4 + i*0.2) * 0.5;
       }
     });
 
+    // Movement
     const moveSpeed = 0.25;
     let moved = false;
     if (keys["w"] || keys["arrowup"]) { player.z -= moveSpeed; moved = true; }
