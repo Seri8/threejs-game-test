@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Closed Wavy Rectangle Tunnel</title>
+  <title>Neon Wavy Rectangle Tunnel</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     canvas { display: block; }
@@ -15,6 +15,7 @@
   let clock = new THREE.Clock();
   let keys = {};
   let player = { x: 0, y: 0, z: 5 };
+  let playerLight;
 
   init();
   animate();
@@ -29,30 +30,41 @@
     // Renderer
     renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000);
     document.body.appendChild(renderer.domElement);
 
+    // Lighting
+    const ambient = new THREE.AmbientLight(0x404040, 0.6); // soft fill light
+    scene.add(ambient);
+
+    playerLight = new THREE.PointLight(0xff0000, 1.5, 50);
+    playerLight.position.set(player.x, player.y, player.z);
+    scene.add(playerLight);
+
     // Build tunnel segments
-    const depth = 200;   // number of segments
+    const depth = 150;   // number of segments
     const length = 5;    // z spacing
     const w = 12;        // tunnel width
     const h = 8;         // tunnel height
-    const thickness = 0.5;
 
     for (let i = 0; i < depth; i++) {
-      let group = new THREE.Group();
+      const color = (i % 2 === 0) ? 0xff0000 : 0x111111;
 
-      // Alternate red / dark gray
-      const color = (i % 2 === 0) ? 0xff0000 : 0x222222;
-      const mat = new THREE.MeshBasicMaterial({ color: color, side: THREE.BackSide }); 
+      const mat = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: (i % 2 === 0) ? 0xff0000 : 0x000000, // glow effect on red
+        emissiveIntensity: (i % 2 === 0) ? 1.2 : 0.2,
+        metalness: 0.3,
+        roughness: 0.4,
+        side: THREE.BackSide
+      });
 
-      // Create a hollow rectangular "tube"
       let boxGeo = new THREE.BoxGeometry(w, h, length);
       let box = new THREE.Mesh(boxGeo, mat);
       box.position.z = -i * length;
-      group.add(box);
 
-      tunnel.push(group);
-      scene.add(group);
+      tunnel.push(box);
+      scene.add(box);
     }
 
     // Controls
@@ -65,13 +77,13 @@
     requestAnimationFrame(animate);
     let t = clock.getElapsedTime();
 
-    // Apply wave motion to tunnel
-    tunnel.forEach((group, i) => {
-      group.position.x = Math.sin(t*2 + i*0.3) * 1.5;
-      group.position.y = Math.cos(t*1.5 + i*0.4) * 1;
+    // Wave motion
+    tunnel.forEach((box, i) => {
+      box.position.x = Math.sin(t*2 + i*0.3) * 1.5;
+      box.position.y = Math.cos(t*1.5 + i*0.4) * 1;
     });
 
-    // Player movement inside tunnel
+    // Player movement
     const moveSpeed = 0.2;
     if (keys["w"] || keys["arrowup"]) player.z -= moveSpeed;
     if (keys["s"] || keys["arrowdown"]) player.z += moveSpeed;
@@ -79,6 +91,7 @@
     if (keys["d"] || keys["arrowright"]) player.x += moveSpeed;
 
     camera.position.set(player.x, player.y, player.z);
+    playerLight.position.set(player.x, player.y, player.z); // light follows player
 
     renderer.render(scene, camera);
   }
