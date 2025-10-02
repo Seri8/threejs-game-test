@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Shaded Neon Wavy Tunnel with HUD</title>
+  <title>Gradient Neon Wavy Tunnel with HUD</title>
   <style>
     body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
     canvas { display: block; }
@@ -36,6 +36,30 @@ let hud = document.getElementById("hud");
 init();
 animate();
 
+function createGradientCylinder(radius, length, segments, innerColor, outerColor) {
+  const geometry = new THREE.CylinderGeometry(radius, radius, length, segments, 1, true);
+  const position = geometry.attributes.position;
+  const colors = [];
+
+  for (let i = 0; i < position.count; i++) {
+    const y = position.getY(i);
+    const t = (y + length/2) / length; // normalize 0-1 along height
+    // Linear interpolation between innerColor and outerColor
+    const r = innerColor.r * (1-t) + outerColor.r * t;
+    const g = innerColor.g * (1-t) + outerColor.g * t;
+    const b = innerColor.b * (1-t) + outerColor.b * t;
+    colors.push(r, g, b);
+  }
+
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function hexToRgb(hex) {
+  const bigint = parseInt(hex.replace(/^#/, ''), 16);
+  return { r: ((bigint >> 16) & 255)/255, g: ((bigint >> 8) & 255)/255, b: (bigint & 255)/255 };
+}
+
 function init() {
   scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x001122, 0, 200);
@@ -64,25 +88,27 @@ function init() {
 
   // Tunnel
   const depth = 100, length = 5;
-  const radius = 6, segments = 32;
+  const radius = 6, segments = 64;
 
   for (let i = 0; i < depth; i++) {
     const isRed = (i % 2 === 0);
 
-    // Gradient shading using MeshStandardMaterial
-    const mat = new THREE.MeshStandardMaterial({
-      color: isRed ? 0xff4444 : 0x222244,
-      emissive: isRed ? 0xff0044 : 0x000022,
-      emissiveIntensity: isRed ? 0.8 : 0.05,
+    // Define gradient colors
+    const innerColor = isRed ? hexToRgb("#ff6666") : hexToRgb("#3333aa");
+    const outerColor = isRed ? hexToRgb("#990000") : hexToRgb("#000055");
+
+    const geometry = createGradientCylinder(radius, length, segments, innerColor, outerColor);
+
+    const material = new THREE.MeshStandardMaterial({
+      vertexColors: true,
       metalness: 0.6,
       roughness: 0.3,
-      side: THREE.BackSide
+      side: THREE.BackSide,
+      emissive: isRed ? 0xff0044 : 0x000022,
+      emissiveIntensity: isRed ? 0.8 : 0.05
     });
 
-    const cylinder = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius, radius, length, segments, 1, true),
-      mat
-    );
+    const cylinder = new THREE.Mesh(geometry, material);
     cylinder.rotation.x = Math.PI / 2;
     cylinder.position.z = -i * length;
     cylinder.userData.isRed = isRed;
@@ -101,18 +127,15 @@ function animate() {
   let t = clock.getElapsedTime();
 
   tunnel.forEach((cylinder, i) => {
-    // Wavy motion
     cylinder.position.x = Math.sin(t*2 + i*0.3) * 1.5;
     cylinder.position.y = Math.cos(t*1.5 + i*0.4) * 1;
 
-    // Pulsing neon for red segments
     if (cylinder.userData.isRed) {
       const pulse = 0.6 + Math.sin(t*3 + i*0.2) * 0.4;
       cylinder.material.emissiveIntensity = pulse;
     }
   });
 
-  // Player movement
   const moveSpeed = 0.2;
   let moved = false;
   if (keys["w"] || keys["arrowup"]) { player.z -= moveSpeed; moved = true; }
