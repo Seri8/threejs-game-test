@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sci-Fi Tunnel</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; font-family: monospace; }
+    canvas { display: block; }
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #00ffea;
+      font-size: 14px;
+      text-shadow: 0 0 8px #00ffff, 0 0 15px #ff00ff;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid #00ffff;
+    }
+  </style>
+</head>
+<body>
+<div id="hud">Loading HUD...</div>
+
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.module.js';
+
+  let scene, camera, renderer, tunnel = [];
+  let clock = new THREE.Clock();
+  let keys = {};
+  let player = { x: 0, y: 0, z: 5, speed: 0 };
+  let playerLight;
+  let hud = document.getElementById('hud');
+
+  const textureLoader = new THREE.TextureLoader();
+
+  // Sci-Fi Panel Textures (from PolyHaven)
+  const texBase = 'https://cdn.jsdelivr.net/gh/Poly-Haven/textures@latest/metal-panels-002/';
+  const diffuseMap   = textureLoader.load(texBase + 'metal-panels-002_diffuse.jpg');
+  const normalMap    = textureLoader.load(texBase + 'metal-panels-002_normal.jpg');
+  const roughnessMap = textureLoader.load(texBase + 'metal-panels-002_roughness.jpg');
+  const aoMap        = textureLoader.load(texBase + 'metal-panels-002_ao.jpg');
+
+  init();
+  animate();
+
+  function init() {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+    // Camera
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(player.x, player.y, player.z);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    document.body.appendChild(renderer.domElement);
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0x222233, 0.8));
+
+    playerLight = new THREE.PointLight(0x00ffff, 2, 50);
+    scene.add(playerLight);
+
+    // Tunnel
+    const depth = 80, length = 6;
+    const radius = 7, segments = 64;
+
+    for (let i = 0; i < depth; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        map: diffuseMap,
+        normalMap: normalMap,
+        roughnessMap: roughnessMap,
+        aoMap: aoMap,
+        emissive: 0x000000,
+        metalness: 0.8,
+        roughness: 0.3,
+        side: THREE.BackSide
+      });
+
+      const geo = new THREE.CylinderGeometry(radius, radius, length, segments, 1, true);
+      geo.setAttribute('uv2', new THREE.BufferAttribute(geo.attributes.uv.array, 2)); // for AO map
+      const cyl = new THREE.Mesh(geo, mat);
+      cyl.rotation.x = Math.PI / 2;
+      cyl.position.z = -i * length;
+      tunnel.push(cyl);
+      scene.add(cyl);
+    }
+
+    // Controls
+    window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+    window.addEventListener('resize', onWindowResize, false);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    let t = clock.getElapsedTime();
+
+    tunnel.forEach((cyl, i) => {
+      cyl.position.x = Math.sin(t * 1.5 + i * 0.3) * 1.5;
+      cyl.position.y = Math.cos(t * 1.0 + i * 0.4) * 1;
+    });
+
+    // Movement
+    const moveSpeed = 0.25;
+    let moved = false;
+    if (keys['w'] || keys['arrowup']) { player.z -= moveSpeed; moved = true; }
+    if (keys['s'] || keys['arrowdown']) { player.z += moveSpeed; moved = true; }
+    if (keys['a'] || keys['arrowleft']) { player.x -= moveSpeed; moved = true; }
+    if (keys['d'] || keys['arrowright']) { player.x += moveSpeed; moved = true; }
+    player.speed = moved ? moveSpeed * 60 : 0;
+
+    camera.position.set(player.x, player.y, player.z);
+    playerLight.position.set(player.x, player.y, player.z);
+
+    hud.innerHTML = `
+      <b>🚀 Tunnel HUD</b><br>
+      X: ${player.x.toFixed(2)}<br>
+      Y: ${player.y.toFixed(2)}<br>
+      Z: ${player.z.toFixed(2)}<br>
+      Speed: ${player.speed.toFixed(1)}
+    `;
+
+    renderer.render(scene, camera);
+  }
+
+  function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+</script>
+</body>
+</html>
