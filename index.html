@@ -119,6 +119,26 @@ function animate() {
   if (keys["d"] || keys["arrowright"]) { player.x += moveSpeed; moved = true; }
   player.speed = moved ? moveSpeed * 60 : 0;
 
+  
+<style>
+  body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
+  canvas { display: block; }
+
+  /* HUD Overlay */
+  #hud {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: #00ffea;
+    font-size: 14px;
+    text-shadow: 0 0 8px #00ffff, 0 0 15px #ff00ff;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid #00ffff;
+  }
+</style>
+  
   // Camera & light follow
   camera.position.set(player.x, player.y, player.z);
   playerLight.position.set(player.x, player.y, player.z);
@@ -144,21 +164,3 @@ function onWindowResize() {
 </body>
 </html>
 
-<style>
-  body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
-  canvas { display: block; }
-
-  /* HUD Overlay */
-  #hud {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: #00ffea;
-    font-size: 14px;
-    text-shadow: 0 0 8px #00ffff, 0 0 15px #ff00ff;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 10px 15px;
-    border-radius: 8px;
-    border: 1px solid #00ffff;
-  }
-</style>
