@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Realistic Neon Tunnel</title>
+  <title>Basic Neon Tunnel</title>
   <style>
     body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
     canvas { display: block; }
@@ -26,11 +26,8 @@
 
 <script type="module">
   import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.module.js";
-  import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/postprocessing/EffectComposer.js";
-  import { RenderPass } from "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/postprocessing/RenderPass.js";
-  import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/postprocessing/UnrealBloomPass.js";
 
-  let scene, camera, renderer, composer, tunnel = [];
+  let scene, camera, renderer, tunnel = [];
   let clock = new THREE.Clock();
   let keys = {};
   let player = { x: 0, y: 0, z: 5, speed: 0 };
@@ -56,13 +53,6 @@
     renderer.outputEncoding = THREE.sRGBEncoding;
     document.body.appendChild(renderer.domElement);
 
-    // Postprocessing
-    const renderPass = new RenderPass(scene, camera);
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.85);
-    composer = new EffectComposer(renderer);
-    composer.addPass(renderPass);
-    composer.addPass(bloomPass);
-
     // Lights
     scene.add(new THREE.AmbientLight(0x222233, 0.5));
 
@@ -76,14 +66,12 @@
     for (let i = 0; i < depth; i++) {
       const isRed = (i % 2 === 0);
 
-      const mat = new THREE.MeshPhysicalMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         color: isRed ? 0xaa0033 : 0x112244,
         emissive: isRed ? 0xff0033 : 0x003366,
         emissiveIntensity: isRed ? 2.0 : 0.3,
         metalness: 0.8,
         roughness: 0.25,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.2,
         side: THREE.BackSide
       });
 
@@ -135,14 +123,13 @@
       Speed: ${player.speed.toFixed(1)}
     `;
 
-    composer.render();
+    renderer.render(scene, camera);
   }
 
   function onWindowResize() {
     camera.aspect = window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    composer.setSize(window.innerWidth, window.innerHeight);
   }
 </script>
 </body>
