@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Neon Wavy Rectangle Tunnel</title>
+  <title>Pulsing Neon Wavy Tunnel</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     canvas { display: block; }
@@ -34,35 +34,36 @@
     document.body.appendChild(renderer.domElement);
 
     // Lighting
-    const ambient = new THREE.AmbientLight(0x404040, 0.6); // soft fill light
+    const ambient = new THREE.AmbientLight(0x404040, 0.6); // soft fill
     scene.add(ambient);
 
     playerLight = new THREE.PointLight(0xff0000, 1.5, 50);
     playerLight.position.set(player.x, player.y, player.z);
     scene.add(playerLight);
 
-    // Build tunnel segments
-    const depth = 150;   // number of segments
-    const length = 5;    // z spacing
-    const w = 12;        // tunnel width
-    const h = 8;         // tunnel height
+    // Tunnel segments
+    const depth = 150;
+    const length = 5;
+    const w = 12;
+    const h = 8;
 
     for (let i = 0; i < depth; i++) {
-      const color = (i % 2 === 0) ? 0xff0000 : 0x111111;
+      const isRed = (i % 2 === 0);
 
       const mat = new THREE.MeshStandardMaterial({
-        color: color,
-        emissive: (i % 2 === 0) ? 0xff0000 : 0x000000, // glow effect on red
-        emissiveIntensity: (i % 2 === 0) ? 1.2 : 0.2,
+        color: isRed ? 0xff0000 : 0x111111,
+        emissive: isRed ? 0xff0000 : 0x000000,
+        emissiveIntensity: isRed ? 1.0 : 0.1,
         metalness: 0.3,
         roughness: 0.4,
         side: THREE.BackSide
       });
 
-      let boxGeo = new THREE.BoxGeometry(w, h, length);
-      let box = new THREE.Mesh(boxGeo, mat);
+      const boxGeo = new THREE.BoxGeometry(w, h, length);
+      const box = new THREE.Mesh(boxGeo, mat);
       box.position.z = -i * length;
 
+      box.userData.isRed = isRed; // store flag for pulsing
       tunnel.push(box);
       scene.add(box);
     }
@@ -81,6 +82,12 @@
     tunnel.forEach((box, i) => {
       box.position.x = Math.sin(t*2 + i*0.3) * 1.5;
       box.position.y = Math.cos(t*1.5 + i*0.4) * 1;
+
+      // Pulsing glow effect
+      if (box.userData.isRed) {
+        let pulse = 0.8 + Math.sin(t*2 + i*0.2) * 0.4; // between 0.4 and 1.2
+        box.material.emissiveIntensity = pulse;
+      }
     });
 
     // Player movement
@@ -91,7 +98,7 @@
     if (keys["d"] || keys["arrowright"]) player.x += moveSpeed;
 
     camera.position.set(player.x, player.y, player.z);
-    playerLight.position.set(player.x, player.y, player.z); // light follows player
+    playerLight.position.set(player.x, player.y, player.z);
 
     renderer.render(scene, camera);
   }
