@@ -2,20 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pulsing Neon Wavy Tunnel</title>
+  <title>Neon Wavy Tunnel with HUD</title>
   <style>
-    body { margin: 0; overflow: hidden; background: black; }
+    body { margin: 0; overflow: hidden; background: black; font-family: monospace; }
     canvas { display: block; }
+
+    /* HUD Overlay */
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #00ffea;
+      font-size: 14px;
+      text-shadow: 0 0 8px #00ffff, 0 0 15px #ff00ff;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid #00ffff;
+    }
   </style>
 </head>
 <body>
+<div id="hud">Loading HUD...</div>
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
 <script>
   let scene, camera, renderer, tunnel = [];
   let clock = new THREE.Clock();
   let keys = {};
-  let player = { x: 0, y: 0, z: 5 };
+  let player = { x: 0, y: 0, z: 5, speed: 0 };
   let playerLight;
+  let hud = document.getElementById("hud");
 
   init();
   animate();
@@ -34,18 +51,15 @@
     document.body.appendChild(renderer.domElement);
 
     // Lighting
-    const ambient = new THREE.AmbientLight(0x404040, 0.6); // soft fill
+    const ambient = new THREE.AmbientLight(0x404040, 0.6);
     scene.add(ambient);
 
     playerLight = new THREE.PointLight(0xff0000, 1.5, 50);
     playerLight.position.set(player.x, player.y, player.z);
     scene.add(playerLight);
 
-    // Tunnel segments
-    const depth = 150;
-    const length = 5;
-    const w = 12;
-    const h = 8;
+    // Tunnel
+    const depth = 150, length = 5, w = 12, h = 8;
 
     for (let i = 0; i < depth; i++) {
       const isRed = (i % 2 === 0);
@@ -63,7 +77,7 @@
       const box = new THREE.Mesh(boxGeo, mat);
       box.position.z = -i * length;
 
-      box.userData.isRed = isRed; // store flag for pulsing
+      box.userData.isRed = isRed;
       tunnel.push(box);
       scene.add(box);
     }
@@ -78,27 +92,40 @@
     requestAnimationFrame(animate);
     let t = clock.getElapsedTime();
 
-    // Wave motion
+    // Wave motion + pulsing neon
     tunnel.forEach((box, i) => {
       box.position.x = Math.sin(t*2 + i*0.3) * 1.5;
       box.position.y = Math.cos(t*1.5 + i*0.4) * 1;
 
-      // Pulsing glow effect
       if (box.userData.isRed) {
-        let pulse = 0.8 + Math.sin(t*2 + i*0.2) * 0.4; // between 0.4 and 1.2
+        let pulse = 0.8 + Math.sin(t*2 + i*0.2) * 0.4;
         box.material.emissiveIntensity = pulse;
       }
     });
 
-    // Player movement
+    // Movement
     const moveSpeed = 0.2;
-    if (keys["w"] || keys["arrowup"]) player.z -= moveSpeed;
-    if (keys["s"] || keys["arrowdown"]) player.z += moveSpeed;
-    if (keys["a"] || keys["arrowleft"]) player.x -= moveSpeed;
-    if (keys["d"] || keys["arrowright"]) player.x += moveSpeed;
+    let moved = false;
 
+    if (keys["w"] || keys["arrowup"]) { player.z -= moveSpeed; moved = true; }
+    if (keys["s"] || keys["arrowdown"]) { player.z += moveSpeed; moved = true; }
+    if (keys["a"] || keys["arrowleft"]) { player.x -= moveSpeed; moved = true; }
+    if (keys["d"] || keys["arrowright"]) { player.x += moveSpeed; moved = true; }
+
+    player.speed = moved ? moveSpeed * 60 : 0; // speed in "units/sec"
+
+    // Camera & light follow
     camera.position.set(player.x, player.y, player.z);
     playerLight.position.set(player.x, player.y, player.z);
+
+    // HUD Update
+    hud.innerHTML = `
+      <b>🚀 Tunnel HUD</b><br>
+      X: ${player.x.toFixed(2)}<br>
+      Y: ${player.y.toFixed(2)}<br>
+      Z: ${player.z.toFixed(2)}<br>
+      Speed: ${player.speed.toFixed(1)}
+    `;
 
     renderer.render(scene, camera);
   }
