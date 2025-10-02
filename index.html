@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Neon Wavy Tunnel with HUD</title>
   <style>
-    body { margin: 0; overflow: hidden; background: black; font-family: monospace; }
+    body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
     canvas { display: block; }
 
     /* HUD Overlay */
@@ -39,7 +39,7 @@ animate();
 
 function init() {
   scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x000000, 0, 200);
+  scene.fog = new THREE.Fog(0x001122, 0, 200);
 
   // Camera
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
@@ -48,7 +48,7 @@ function init() {
   // Renderer
   renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000);
+  renderer.setClearColor(0x001122); // blue background
   document.body.appendChild(renderer.domElement);
 
   // Lighting
@@ -119,26 +119,6 @@ function animate() {
   if (keys["d"] || keys["arrowright"]) { player.x += moveSpeed; moved = true; }
   player.speed = moved ? moveSpeed * 60 : 0;
 
-  
-<style>
-  body { margin: 0; overflow: hidden; background: #001122; font-family: monospace; }
-  canvas { display: block; }
-
-  /* HUD Overlay */
-  #hud {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: #00ffea;
-    font-size: 14px;
-    text-shadow: 0 0 8px #00ffff, 0 0 15px #ff00ff;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 10px 15px;
-    border-radius: 8px;
-    border: 1px solid #00ffff;
-  }
-</style>
-  
   // Camera & light follow
   camera.position.set(player.x, player.y, player.z);
   playerLight.position.set(player.x, player.y, player.z);
@@ -163,4 +143,3 @@ function onWindowResize() {
 </script>
 </body>
 </html>
-
