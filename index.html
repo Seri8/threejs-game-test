@@ -1,361 +1,135 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hyper-realistic Metro in Tunnel — Three.js</title>
-  <style>
-    html,body{height:100%;margin:0;background:#000}
-    #container{width:100%;height:100%;overflow:hidden}
-    .help{position:fixed;left:12px;top:12px;color:#ddd;font-family:Inter,Arial,Helvetica,sans-serif;background:rgba(0,0,0,0.25);padding:8px 12px;border-radius:8px}
-  </style>
-</head>
-<body>
-<div id="container"></div>
-<div class="help">WASD / arrow keys to nudge camera | Scroll to zoom</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js Metro Tunnel - Bright Cinematic</title>
+    <style>
+      body { margin: 0; overflow: hidden; background: black; }
+      canvas { display: block; }
+      #warn {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: #ff6666;
+        font-family: monospace;
+        background: rgba(0,0,0,0.5);
+        padding: 6px 10px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="warn"></div>
+    <script type="module">
+      import * as THREE from 'https://unpkg.com/three@0.164.1/build/three.module.js';
+      import { OrbitControls } from 'https://unpkg.com/three@0.164.1/examples/jsm/controls/OrbitControls.js';
+      import { EffectComposer } from 'https://unpkg.com/three@0.164.1/examples/jsm/postprocessing/EffectComposer.js';
+      import { RenderPass } from 'https://unpkg.com/three@0.164.1/examples/jsm/postprocessing/RenderPass.js';
+      import { UnrealBloomPass } from 'https://unpkg.com/three@0.164.1/examples/jsm/postprocessing/UnrealBloomPass.js';
 
-<!-- Modules from UNPKG (no build step) -->
-<script type="module">
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-import { EffectComposer } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+      if (window.location.protocol === 'file:') {
+        document.getElementById('warn').innerText = '⚠️ Please run via local server (python -m http.server) for best performance.';
+      }
 
-// ---------- Scene + Renderer ----------
-const container = document.getElementById('container');
-const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x000000, 0.0025);
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x000000, 0.02);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-container.appendChild(renderer.domElement);
+      const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+      camera.position.set(0, 1.5, 5);
 
-// ---------- Camera + Controls ----------
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(0, 4, -18);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.maxPolarAngle = Math.PI / 2.1;
-controls.minDistance = 6;
-controls.maxDistance = 60;
-controls.enableDamping = true;
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 1, 0);
+      controls.update();
 
-// ---------- Environment (procedural cube map) ----------
-function makeTinyCubeTexture() {
-  const size = 128;
-  const faces = [];
-  for (let i = 0; i < 6; i++) {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    // gradient background
-    const grad = ctx.createLinearGradient(0, 0, size, size);
-    grad.addColorStop(0, '#0a0a0a');
-    grad.addColorStop(1, '#111827');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
-    // add some procedurally-placed bright lines to mimic distant lights/reflections
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-    for (let j = 0; j < 6; j++) {
-      ctx.beginPath();
-      const x = Math.random() * size;
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x + (Math.random() - 0.5) * size * 0.1, size);
-      ctx.stroke();
-    }
-    faces.push(canvas);
-  }
-  const cubeTex = new THREE.CubeTexture(faces.map(c => new THREE.CanvasTexture(c)));
-  cubeTex.needsUpdate = true;
-  return cubeTex;
-}
+      // Tunnel
+      const tunnelGeo = new THREE.CylinderGeometry(4, 4, 100, 64, 1, true);
+      tunnelGeo.rotateX(Math.PI / 2);
+      tunnelGeo.scale(1, -1, 1); // Flip normals inward
+      const tunnelMat = new THREE.MeshStandardMaterial({
+        color: 0x444444,
+        side: THREE.BackSide,
+        roughness: 0.6,
+        metalness: 0.2,
+        emissive: 0x111111,
+        emissiveIntensity: 0.2
+      });
+      const tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
+      scene.add(tunnel);
 
-const envMap = makeTinyCubeTexture();
-scene.environment = envMap;
-scene.background = new THREE.Color(0x020305);
+      // Metro car
+      const metro = new THREE.Group();
+      const carBody = new THREE.Mesh(
+        new THREE.BoxGeometry(1.8, 1.6, 4),
+        new THREE.MeshStandardMaterial({ color: 0x3366ff, metalness: 0.9, roughness: 0.3 })
+      );
+      carBody.position.y = 1;
+      carBody.castShadow = true;
+      metro.add(carBody);
 
-// ---------- Tunnel (inverted cylinder) ----------
-const tunnelRadius = 12;
-const tunnelLength = 2000;
-const tunnelSegs = 128;
-const tunnelGeo = new THREE.CylinderGeometry(tunnelRadius, tunnelRadius, tunnelLength, 64, tunnelSegs, true);
-// flip the normals so we see the interior
-tunnelGeo.scale(1, 1, -1);
+      // Bright headlights
+      const headLightL = new THREE.SpotLight(0xffffff, 10, 30, Math.PI / 5, 0.5, 2);
+      headLightL.position.set(-0.4, 1.1, 2);
+      const headLightR = headLightL.clone();
+      headLightR.position.x = 0.4;
+      metro.add(headLightL, headLightR);
+      scene.add(metro);
 
-// create a tiled concrete-ish texture using canvas
-function makeTunnelTexture() {
-  const size = 1024;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#2a2a2a';
-  ctx.fillRect(0, 0, size, size);
-  // add horizontal seam lines
-  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-  ctx.lineWidth = 2;
-  for (let y = 0; y < 20; y++) {
-    ctx.beginPath();
-    ctx.moveTo(0, (y + 1) * (size / 20));
-    ctx.lineTo(size, (y + 1) * (size / 20));
-    ctx.stroke();
-  }
-  // noise
-  const img = ctx.getImageData(0, 0, size, size);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = (Math.random() * 20 - 10);
-    img.data[i] = Math.max(0, img.data[i] + v);
-    img.data[i + 1] = Math.max(0, img.data[i + 1] + v);
-    img.data[i + 2] = Math.max(0, img.data[i + 2] + v);
-  }
-  ctx.putImageData(img, 0, 0);
-  return new THREE.CanvasTexture(canvas);
-}
+      // Tunnel lights (emissive lamps)
+      const lampMat = new THREE.MeshStandardMaterial({ emissive: 0xffffff, emissiveIntensity: 3 });
+      for (let i = 0; i < 40; i++) {
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.1), lampMat);
+        lamp.position.set(0, 3.8, -i * 2.5);
+        scene.add(lamp);
+      }
 
-const tunnelMat = new THREE.MeshStandardMaterial({
-  map: makeTunnelTexture(),
-  roughness: 0.95,
-  metalness: 0.0,
-  side: THREE.BackSide
-});
-const tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
-// rotate so the cylinder runs along z
-tunnel.rotation.x = Math.PI / 2;
-scene.add(tunnel);
+      // Track sleepers
+      const railMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.6, roughness: 0.4 });
+      for (let i = -50; i < 50; i++) {
+        const sleeper = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 0.2), railMat);
+        sleeper.position.set(0, 0, i * 1.5);
+        scene.add(sleeper);
+      }
 
-// ---------- Tracks ----------
-function makeTrack() {
-  const trackGroup = new THREE.Group();
-  const sleeperGeo = new THREE.BoxGeometry(0.6, 0.2, 3);
-  const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x3b2f2f, roughness: 0.8 });
-  const railGeo = new THREE.BoxGeometry(0.15, 0.15, 2000);
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x8b7f6f, metalness: 0.9, roughness: 0.3 });
-  const leftRail = new THREE.Mesh(railGeo, railMat);
-  const rightRail = leftRail.clone();
-  const spacing = 2.2;
-  leftRail.position.set(-spacing, -tunnelRadius + 0.5, 0);
-  rightRail.position.set(spacing, -tunnelRadius + 0.5, 0);
-  leftRail.receiveShadow = rightRail.receiveShadow = true;
-  trackGroup.add(leftRail, rightRail);
-  // sleepers
-  for (let z = -tunnelLength / 2; z < tunnelLength / 2; z += 4) {
-    const s = new THREE.Mesh(sleeperGeo, sleeperMat);
-    s.position.set(0, -tunnelRadius + 0.45, z);
-    s.receiveShadow = true;
-    trackGroup.add(s);
-  }
-  return trackGroup;
-}
-scene.add(makeTrack());
+      // Lighting
+      const ambient = new THREE.AmbientLight(0xffffff, 1.5);
+      scene.add(ambient);
 
-// ---------- Metro (procedural) ----------
-function makeMetro() {
-  const car = new THREE.Group();
-  // body
-  const bodyGeo = new THREE.BoxGeometry(3.5, 2.2, 10);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x263238, metalness: 0.35, roughness: 0.2, envMap: envMap });
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.castShadow = body.receiveShadow = true;
-  body.position.y = 0.8;
-  car.add(body);
-  // windows
-  const winGeo = new THREE.BoxGeometry(3.26, 0.9, 1.2);
-  for (let i = -2; i <= 2; i++) {
-    const w = new THREE.Mesh(winGeo, new THREE.MeshStandardMaterial({ color: 0x071826, metalness: 0, roughness: 0.05, emissive: 0x001417, envMap: envMap }));
-    w.position.set(0, 0.6, i * 2.4 + 0.8);
-    w.castShadow = false;
-    car.add(w);
-  }
-  // headlights
-  const headL = new THREE.SpotLight(0xfff6e0, 6, 80, Math.PI / 9, 0.25, 2);
-  const headR = headL.clone();
-  headL.position.set(-0.8, 0.6, 5.5);
-  headR.position.set(0.8, 0.6, 5.5);
-  headL.target.position.set(0, 0, 50);
-  headR.target.position.set(0, 0, 50);
-  headL.castShadow = headR.castShadow = true;
-  car.add(headL);
-  car.add(headR);
-  car.add(headL.target);
-  car.add(headR.target);
-  // roof lights (emissive strips)
-  const stripGeo = new THREE.BoxGeometry(3.6, 0.05, 10);
-  const strip = new THREE.Mesh(stripGeo, new THREE.MeshStandardMaterial({ emissive: 0xfff1d6, emissiveIntensity: 0.05, metalness: 0 }));
-  strip.position.set(0, 1.3, 0);
-  car.add(strip);
-  // wheels (visual only)
-  const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.6, 12);
-  wheelGeo.rotateZ(Math.PI / 2);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0b, metalness: 0.6, roughness: 0.4 });
-  for (let i = -1; i <= 1; i += 2) {
-    for (let z = -3; z <= 3; z += 3) {
-      const w = new THREE.Mesh(wheelGeo, wheelMat);
-      w.position.set(i * 1.4, -0.1, z);
-      w.castShadow = true;
-      car.add(w);
-    }
-  }
-  return car;
-}
+      const pointLight = new THREE.PointLight(0xffffff, 1.5, 50);
+      camera.add(pointLight);
+      scene.add(camera);
 
-const metro = makeMetro();
-metro.scale.setScalar(1);
-scene.add(metro);
+      // Postprocessing
+      const composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.6, 0.2);
+      composer.addPass(bloom);
 
-// ---------- Path for metro ----------
-const points = [];
-const pathLength = 1200;
-for (let i = 0; i < 14; i++) {
-  const z = -pathLength / 2 + (i / 13) * pathLength;
-  const x = Math.sin(i * 0.6) * 2.6;
-  const y = Math.cos(i * 0.4) * 0.6;
-  points.push(new THREE.Vector3(x, y - 0.2, z));
-}
-const curve = new THREE.CatmullRomCurve3(points);
-curve.curveType = 'catmullrom';
-curve.closed = true;
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+      });
 
-// debug helper
-// const helperPoints = new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(200)), new THREE.LineBasicMaterial({ color:0xff0000 }));
-// scene.add(helperPoints);
+      // Animate
+      let time = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+        time += 0.02;
+        metro.position.z = (time * 8) % 160 - 80;
+        tunnel.position.z = metro.position.z - 10;
+        metro.rotation.y = Math.sin(time) * 0.05;
+        composer.render();
+      }
 
-let progress = 0; // 0..1
-const speed = 0.00045; // base speed
-
-// ---------- Particles / dust ----------
-const particleCount = 1200;
-const particleGeo = new THREE.BufferGeometry();
-const positions = new Float32Array(particleCount * 3);
-for (let i = 0; i < particleCount; i++) {
-  const z = (Math.random() - 0.5) * pathLength;
-  const r = tunnelRadius - 0.5 - Math.random() * 2.5;
-  const theta = Math.random() * Math.PI * 2;
-  positions[i * 3 + 0] = Math.cos(theta) * r;
-  positions[i * 3 + 1] = Math.sin(theta) * r + (Math.random() - 0.5) * 0.3;
-  positions[i * 3 + 2] = z;
-}
-particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-const particleMat = new THREE.PointsMaterial({ size: 0.08, transparent: true, opacity: 0.8, depthWrite: false });
-const particles = new THREE.Points(particleGeo, particleMat);
-scene.add(particles);
-
-// ---------- Lighting ----------
-// ambient
-scene.add(new THREE.AmbientLight(0x101010));
-// tunnel lamps (repeating strips)
-const lampGroup = new THREE.Group();
-for (let z = -tunnelLength / 2 + 8; z < tunnelLength / 2; z += 18) {
-  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), new THREE.MeshStandardMaterial({ emissive: 0xffefe0, emissiveIntensity: 0.6, roughness: 1 }));
-  lamp.rotation.z = Math.PI / 2;
-  lamp.position.set(-tunnelRadius + 0.6, 2.5, z);
-  lamp.receiveShadow = false;
-  lampGroup.add(lamp);
-  const lamp2 = lamp.clone();
-  lamp2.position.x = tunnelRadius - 0.6;
-  lampGroup.add(lamp2);
-}
-scene.add(lampGroup);
-
-// ---------- Postprocessing (bloom) ----------
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.4, 0.1);
-bloom.threshold = 0.15;
-composer.addPass(bloom);
-
-// ---------- Window Resize ----------
-window.addEventListener('resize', onWindowResize);
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-}
-
-// ---------- Animation Loop ----------
-const clock = new THREE.Clock();
-let prevTime = 0;
-
-function animate() {
-  const dt = clock.getDelta();
-  const t = clock.getElapsedTime();
-
-  // advance progress and add a bit of speed wobble
-  progress += speed * (1 + Math.sin(t * 2.2) * 0.06);
-  progress %= 1;
-  const pos = curve.getPointAt(progress);
-  const tangent = curve.getTangentAt(progress).normalize();
-
-  // position metro slightly on rails
-  metro.position.copy(pos);
-  // orient to tangent
-  const axis = new THREE.Vector3(0, 1, 0);
-  const up = new THREE.Vector3(0, 1, 0);
-  const lookAt = pos.clone().add(tangent);
-  metro.lookAt(lookAt);
-  // small roll for realism
-  metro.rotateZ(Math.sin(t * 6) * 0.002);
-
-  // animate wheels rotation (visual)
-  metro.traverse((child) => {
-    if (child.geometry && child.geometry.type === 'CylinderGeometry') {
-      child.rotation.x -= dt * 12; // spin
-    }
-  });
-
-  // move particles relative to the metro so they appear to stream by
-  const positions = particleGeo.attributes.position.array;
-  for (let i = 0; i < particleCount; i++) {
-    positions[i * 3 + 2] += dt * 200 * (1 + Math.sin(i) * 0.01) * (speed * 2000);
-    if (positions[i * 3 + 2] > pathLength / 2) positions[i * 3 + 2] -= pathLength;
-  }
-  particleGeo.attributes.position.needsUpdate = true;
-
-  // make headlights follow forward direction
-  metro.traverse((ch) => {
-    if (ch.type === 'SpotLight') {
-      const forward = tangent.clone().multiplyScalar(1);
-      ch.position.copy(metro.position).add(new THREE.Vector3(0, 0.6, 0).applyQuaternion(metro.quaternion));
-      ch.target.position.copy(metro.position).add(forward.multiplyScalar(60));
-      ch.target.updateMatrixWorld();
-    }
-  });
-
-  // slight camera follow (damped)
-  const desiredCamPos = metro.position.clone().add(new THREE.Vector3(0, 4, -12).applyQuaternion(metro.quaternion));
-  camera.position.lerp(desiredCamPos, 0.06);
-  const lookAtPos = metro.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-  camera.lookAt(lookAtPos);
-
-  controls.update();
-
-  // render with postprocessing for bloom
-  composer.render();
-
-  requestAnimationFrame(animate);
-}
-
-// kick off
-animate();
-
-// ---------- Keyboard nudges ----------
-const keys = {};
-window.addEventListener('keydown', (e) => keys[e.code] = true);
-window.addEventListener('keyup', (e) => keys[e.code] = false);
-
-function handleNudges() {
-  if (keys['KeyW'] || keys['ArrowUp']) camera.position.z -= 0.25;
-  if (keys['KeyS'] || keys['ArrowDown']) camera.position.z += 0.25;
-  if (keys['KeyA'] || keys['ArrowLeft']) camera.position.x -= 0.25;
-  if (keys['KeyD'] || keys['ArrowRight']) camera.position.x += 0.25;
-  requestAnimationFrame(handleNudges);
-}
-handleNudges();
-
-</script>
-</body>
+      animate();
+    </script>
+  </body>
 </html>
