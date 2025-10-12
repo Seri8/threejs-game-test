@@ -1,135 +1,317 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Three.js Metro Tunnel - Bright Cinematic</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no"
+    />
+    <title>Metro Tunnel — three.js (single-file)</title>
+    <meta name="description" content="AAA-feel metro moving through a realistic tunnel in three.js, single HTML file for GitHub Pages." />
     <style>
-      body { margin: 0; overflow: hidden; background: black; }
+      html, body { margin: 0; padding: 0; height: 100%; background: #0a0a0a; }
       canvas { display: block; }
-      #warn {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        color: #ff6666;
-        font-family: monospace;
-        background: rgba(0,0,0,0.5);
-        padding: 6px 10px;
-        border-radius: 4px;
+      #overlay {
+        position: fixed; inset: 0; pointer-events: none; color: #bbb;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        font-size: 12px; padding: 16px; mix-blend-mode: difference;
       }
+      #overlay .stats { position: absolute; bottom: 16px; left: 16px; }
     </style>
   </head>
   <body>
-    <div id="warn"></div>
+    <div id="overlay">
+      <div class="stats">W/A/S/D: camera strafe • Mouse: look • R: reset</div>
+    </div>
+
     <script type="module">
-      import * as THREE from 'https://unpkg.com/three@0.164.1/build/three.module.js';
-      import { OrbitControls } from 'https://unpkg.com/three@0.164.1/examples/jsm/controls/OrbitControls.js';
-      import { EffectComposer } from 'https://unpkg.com/three@0.164.1/examples/jsm/postprocessing/EffectComposer.js';
-      import { RenderPass } from 'https://unpkg.com/three@0.164.1/examples/jsm/postprocessing/RenderPass.js';
-      import { UnrealBloomPass } from 'https://unpkg.com/three@0.164.1/examples/jsm/postprocessing/UnrealBloomPass.js';
+      import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+      import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+      import { EffectComposer } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js';
+      import { RenderPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js';
+      import { UnrealBloomPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+      import { SSAOPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/SSAOPass.js';
+      import { BokehPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/BokehPass.js';
 
-      if (window.location.protocol === 'file:') {
-        document.getElementById('warn').innerText = '⚠️ Please run via local server (python -m http.server) for best performance.';
+      let renderer, scene, camera, composer, controls;
+      let clock = new THREE.Clock();
+      let train, trainGroup, trainSpeed = 18; // m/s-ish
+      let tunnelMesh, railsMesh;
+      let camRig, camShake = new THREE.Vector3();
+
+      const params = {
+        bloomStrength: 0.35,
+        bloomRadius: 0.5,
+        bloomThreshold: 0.8
+      };
+
+      init();
+      animate();
+
+      function init() {
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        document.body.appendChild(renderer.domElement);
+
+        // Scene & camera
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0c0e);
+        scene.fog = new THREE.FogExp2(0x050607, 0.05);
+
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0.2, 1.35, -2.4);
+
+        camRig = new THREE.Object3D();
+        camRig.position.set(0, 1.4, 0);
+        camRig.add(camera);
+        scene.add(camRig);
+
+        // Controls
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enablePan = true;
+        controls.enableDamping = true;
+        controls.minDistance = 0.2;
+        controls.maxDistance = 7;
+        controls.target.set(0, 1.4, 0);
+
+        // Lighting (no external HDR; physically plausible setup)
+        const key = new THREE.RectAreaLight(0xffffff, 8, 8, 4);
+        key.position.set(2, 2.5, -4);
+        key.lookAt(0, 1.5, 0);
+        scene.add(key);
+
+        const rim = new THREE.DirectionalLight(0x9bb8ff, 0.6);
+        rim.position.set(-3, 4, 3);
+        scene.add(rim);
+
+        scene.add(new THREE.AmbientLight(0x808080, 0.25));
+
+        // Tunnel + rails + sleepers
+        createTunnel();
+        createRails();
+
+        // Train placeholder (runs without external assets)
+        createTrain();
+
+        // Post-processing
+        setupPost();
+
+        // Events
+        window.addEventListener('resize', onResize);
+        window.addEventListener('keydown', onKey);
       }
 
-      const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x000000, 0.02);
+      function createTunnel() {
+        const length = 600;
+        const radius = 3.5;
+        const segments = 1200;
 
-      const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
-      camera.position.set(0, 1.5, 5);
+        const pts = [];
+        for (let i = 0; i <= segments; i++) {
+          const t = i / segments;
+          const z = -length * t;
+          const x = Math.sin(t * Math.PI * 2 * 0.15) * 0.3 + Math.sin(t * Math.PI * 5) * 0.05;
+          const y = 0.02 * Math.sin(t * 12.0);
+          pts.push(new THREE.Vector3(x, y, z));
+        }
+        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.05);
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.shadowMap.enabled = true;
-      document.body.appendChild(renderer.domElement);
+        const tubularSegments = 800;
+        const radialSegments = 48;
+        const geometry = new THREE.TubeGeometry(curve, tubularSegments, radius, radialSegments, false);
 
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.target.set(0, 1, 0);
-      controls.update();
+        const mat = new THREE.MeshPhysicalMaterial({
+          color: 0x4e5358,
+          roughness: 0.95,
+          metalness: 0.0,
+          sheen: 0.2,
+          reflectivity: 0.25,
+          clearcoat: 0.08,
+          clearcoatRoughness: 0.7
+        });
 
-      // Tunnel
-      const tunnelGeo = new THREE.CylinderGeometry(4, 4, 100, 64, 1, true);
-      tunnelGeo.rotateX(Math.PI / 2);
-      tunnelGeo.scale(1, -1, 1); // Flip normals inward
-      const tunnelMat = new THREE.MeshStandardMaterial({
-        color: 0x444444,
-        side: THREE.BackSide,
-        roughness: 0.6,
-        metalness: 0.2,
-        emissive: 0x111111,
-        emissiveIntensity: 0.2
-      });
-      const tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
-      scene.add(tunnel);
+        tunnelMesh = new THREE.Mesh(geometry, mat);
+        tunnelMesh.receiveShadow = true;
+        scene.add(tunnelMesh);
 
-      // Metro car
-      const metro = new THREE.Group();
-      const carBody = new THREE.Mesh(
-        new THREE.BoxGeometry(1.8, 1.6, 4),
-        new THREE.MeshStandardMaterial({ color: 0x3366ff, metalness: 0.9, roughness: 0.3 })
-      );
-      carBody.position.y = 1;
-      carBody.castShadow = true;
-      metro.add(carBody);
+        // Emissive light strips
+        const stripMat = new THREE.MeshBasicMaterial({ color: 0xbcd7ff });
+        const stripGeo = new THREE.PlaneGeometry(0.12, 2.0);
+        const count = 65;
+        for (let i = 0; i < count; i++) {
+          const t = i / count;
+          const p = curve.getPointAt(t);
+          const n = curve.getTangentAt(t);
+          const left = new THREE.Vector3(-n.z, 0, n.x).normalize();
+          const up = new THREE.Vector3(0, 1, 0);
+          const strip = new THREE.Mesh(stripGeo, stripMat);
+          strip.position.copy(p).add(left.multiplyScalar(radius - 0.25)).add(up.multiplyScalar(0.4));
+          strip.lookAt(p.clone().add(n));
+          scene.add(strip);
 
-      // Bright headlights
-      const headLightL = new THREE.SpotLight(0xffffff, 10, 30, Math.PI / 5, 0.5, 2);
-      headLightL.position.set(-0.4, 1.1, 2);
-      const headLightR = headLightL.clone();
-      headLightR.position.x = 0.4;
-      metro.add(headLightL, headLightR);
-      scene.add(metro);
+          const area = new THREE.RectAreaLight(0xbcd7ff, 2.0, 0.12, 2.0);
+          area.position.copy(strip.position);
+          area.lookAt(strip.position.clone().add(n));
+          scene.add(area);
+        }
 
-      // Tunnel lights (emissive lamps)
-      const lampMat = new THREE.MeshStandardMaterial({ emissive: 0xffffff, emissiveIntensity: 3 });
-      for (let i = 0; i < 40; i++) {
-        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.1), lampMat);
-        lamp.position.set(0, 3.8, -i * 2.5);
-        scene.add(lamp);
+        // Subtle ambient haze near headlights (fake volumetrics)
+        const hazeGeo = new THREE.CylinderGeometry(radius - 0.6, radius - 0.6, 12, 32, 1, true);
+        const hazeMat = new THREE.MeshBasicMaterial({ color: 0x99bbff, transparent: true, opacity: 0.06, side: THREE.DoubleSide });
+        const haze = new THREE.Mesh(hazeGeo, hazeMat);
+        haze.position.set(0, 0.9, 6);
+        scene.add(haze);
       }
 
-      // Track sleepers
-      const railMat = new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.6, roughness: 0.4 });
-      for (let i = -50; i < 50; i++) {
-        const sleeper = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 0.2), railMat);
-        sleeper.position.set(0, 0, i * 1.5);
-        scene.add(sleeper);
+      function createRails() {
+        const railMat = new THREE.MeshPhysicalMaterial({
+          color: 0x999ca3,
+          metalness: 1.0,
+          roughness: 0.35
+        });
+
+        const railGeo = new THREE.BoxGeometry(0.06, 0.08, 600);
+        const railOffset = 0.75;
+
+        const leftRail = new THREE.Mesh(railGeo, railMat);
+        leftRail.position.set(-railOffset, 0.3, -300);
+        const rightRail = leftRail.clone();
+        rightRail.position.x = railOffset;
+
+        railsMesh = new THREE.Group();
+        railsMesh.add(leftRail, rightRail);
+        scene.add(railsMesh);
+
+        const sleeperGeo = new THREE.BoxGeometry(1.4, 0.06, 0.28);
+        const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x4b4e52, roughness: 0.9 });
+        for (let i = 0; i < 400; i++) {
+          const sleeper = new THREE.Mesh(sleeperGeo, sleeperMat);
+          sleeper.position.set(0, 0.28, -1.4 * i);
+          scene.add(sleeper);
+        }
       }
 
-      // Lighting
-      const ambient = new THREE.AmbientLight(0xffffff, 1.5);
-      scene.add(ambient);
+      function createTrain() {
+        trainGroup = new THREE.Group();
 
-      const pointLight = new THREE.PointLight(0xffffff, 1.5, 50);
-      camera.add(pointLight);
-      scene.add(camera);
+        const bodyGeo = new THREE.BoxGeometry(2.6, 2.8, 12);
+        const bodyMat = new THREE.MeshPhysicalMaterial({
+          color: 0x2b2e32,
+          metalness: 0.75,
+          roughness: 0.4,
+          clearcoat: 0.25,
+          clearcoatRoughness: 0.4
+        });
+        train = new THREE.Mesh(bodyGeo, bodyMat);
+        train.castShadow = true;
+        train.position.set(0, 1.45, 0);
+        trainGroup.add(train);
 
-      // Postprocessing
-      const composer = new EffectComposer(renderer);
-      composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.6, 0.2);
-      composer.addPass(bloom);
+        // Headlights
+        const headLightL = new THREE.SpotLight(0xbcd7ff, 2.2, 30, Math.PI / 6, 0.3, 0.9);
+        headLightL.position.set(-0.8, 1.2, 6.2);
+        headLightL.target.position.set(-0.8, 1.0, 12);
+        trainGroup.add(headLightL, headLightL.target);
 
-      window.addEventListener('resize', () => {
+        const headLightR = headLightL.clone();
+        headLightR.position.x = 0.8;
+        headLightR.target.position.x = 0.8;
+        trainGroup.add(headLightR, headLightR.target);
+
+        // Interior emission
+        const interior = new THREE.PointLight(0xffffff, 0.5, 5);
+        interior.position.set(0, 1.8, -2.0);
+        trainGroup.add(interior);
+
+        // Subtle emissive panels for windows
+        const winGeo = new THREE.PlaneGeometry(0.9, 0.6);
+        const winMat = new THREE.MeshBasicMaterial({ color: 0xddddff });
+        for (let i = -2; i <= 2; i++) {
+          const w = new THREE.Mesh(winGeo, winMat);
+          w.position.set(1.29, 1.6, -2 + i * 1.8);
+          w.rotation.y = Math.PI / 2;
+          trainGroup.add(w);
+          const w2 = w.clone();
+          w2.position.x = -1.29;
+          w2.rotation.y = -Math.PI / 2;
+          trainGroup.add(w2);
+        }
+
+        scene.add(trainGroup);
+      }
+
+      function setupPost() {
+        composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        const ssao = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+        ssao.kernelRadius = 8;
+        ssao.minDistance = 0.001;
+        ssao.maxDistance = 0.12;
+        composer.addPass(ssao);
+
+        const bokeh = new BokehPass(scene, camera, {
+          focus: 3.0,
+          aperture: 0.00035,
+          maxblur: 0.01,
+        });
+        composer.addPass(bokeh);
+
+        const bloom = new UnrealBloomPass(
+          new THREE.Vector2(window.innerWidth, window.innerHeight),
+          params.bloomStrength,
+          params.bloomRadius,
+          params.bloomThreshold
+        );
+        composer.addPass(bloom);
+      }
+
+      function animate() {
+        const dt = clock.getDelta();
+        requestAnimationFrame(animate);
+
+        // Train movement
+        trainGroup.position.z -= trainSpeed * dt;
+
+        // Camera rig rides with train
+        camRig.position.z = trainGroup.position.z - 2.8;
+
+        // Camera shake
+        const shakeAmp = 0.005;
+        camShake.x = (Math.random() - 0.5) * shakeAmp;
+        camShake.y = (Math.random() - 0.5) * shakeAmp;
+        camera.position.x = 0.2 + camShake.x;
+        camera.position.y = 1.35 + camShake.y;
+
+        controls.target.set(camRig.position.x, camRig.position.y, camRig.position.z + 4);
+        controls.update();
+
+        composer.render();
+      }
+
+      function onResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
         composer.setSize(window.innerWidth, window.innerHeight);
-      });
-
-      // Animate
-      let time = 0;
-      function animate() {
-        requestAnimationFrame(animate);
-        time += 0.02;
-        metro.position.z = (time * 8) % 160 - 80;
-        tunnel.position.z = metro.position.z - 10;
-        metro.rotation.y = Math.sin(time) * 0.05;
-        composer.render();
       }
 
-      animate();
+      function onKey(e) {
+        if (e.code === 'KeyR') {
+          trainGroup.position.set(0, 0, 0);
+          camRig.position.set(0, 1.4, 0);
+        }
+        const step = 0.15;
+        if (e.code === 'KeyA') camRig.position.x -= step;
+        if (e.code === 'KeyD') camRig.position.x += step;
+        if (e.code === 'KeyW') camRig.position.y += step;
+        if (e.code === 'KeyS') camRig.position.y -= step;
+      }
     </script>
   </body>
 </html>
